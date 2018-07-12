@@ -21,15 +21,18 @@ namespace ReservationWebApi.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
+        private RoleManager<IdentityRole> _roleManager { get; }
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            RoleManager<IdentityRole> roleManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
+            _roleManager = roleManager;
         }
 
         [Route("Create")]
@@ -75,7 +78,7 @@ namespace ReservationWebApi.Controllers
                                                                       isPersistent: false, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
-                    return BuildToken(UserForLoginDTO);
+                    return await BuildToken(UserForLoginDTO);
                 }
                 else
                 {
@@ -89,12 +92,18 @@ namespace ReservationWebApi.Controllers
             }
         }
 
-        private IActionResult BuildToken(UserForLoginDTO userForLoginDTO)
+        private async Task<IActionResult> BuildToken(UserForLoginDTO userForLoginDTO)
         {
+            var role = await _roleManager.FindByNameAsync(userForLoginDTO.Username);
+
+            if (role == null)
+                return BadRequest();
+            
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.UniqueName, userForLoginDTO.Username),
                 new Claim("miValor", "Lo que yo quiera"),
+                new Claim(ClaimTypes.Role, role.Name),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
