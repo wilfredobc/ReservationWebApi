@@ -64,7 +64,7 @@ namespace ReservationWebApi.Controllers
                 return BadRequest();
             }
 
-            return StatusCode(201);
+            return StatusCode(201, "Rol creado satisfactoriamente");
         }
 
         [HttpPost("delete")]
@@ -81,7 +81,7 @@ namespace ReservationWebApi.Controllers
                     return BadRequest();
                 }
 
-                return Ok();
+                return Ok("Rol eliminado satisfactoriamente");
             }
 
             return NotFound();
@@ -100,10 +100,10 @@ namespace ReservationWebApi.Controllers
 
                 if (!result.Succeeded)
                 {
-                    return BadRequest();
+                    return BadRequest("Ocurrio un error intentando actualizar el rol");
                 }
 
-                return Ok();
+                return Ok("Rol actualizado satisfactoriamente");
             }
 
             return NotFound();

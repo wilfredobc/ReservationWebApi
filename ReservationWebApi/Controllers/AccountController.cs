@@ -14,8 +14,8 @@ using ReservationWebApi.Models;
 
 namespace ReservationWebApi.Controllers
 {
-    [Produces("application/json")]
-    [Route("api/Account")]
+    [Route("api/[controller]")]
+    [ApiController]
     public class AccountController : Controller
     {
         private readonly UserManager<ApplicationUser> _userManager;
@@ -39,9 +39,10 @@ namespace ReservationWebApi.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateUser([FromBody] UserForRegisterDTO userForRegisterDTO)
         {
-            var crear = await _userManager.AddToRoleAsync(await _userManager.FindByNameAsync("Admin"), "Admin");
+            //Esta sentencia es para crear al adminitrador
+            //var crear = await _userManager.AddToRoleAsync(await _userManager.FindByNameAsync("Admin"), "Admin");
 
-             if (await _userManager.FindByEmailAsync(userForRegisterDTO.Email) != null)
+            if (await _userManager.FindByEmailAsync(userForRegisterDTO.Email) != null)
                 ModelState.AddModelError("Email", "Este email ya ha sido utilizado");
 
             else if (await _userManager.FindByNameAsync(userForRegisterDTO.Username) != null)
@@ -49,16 +50,17 @@ namespace ReservationWebApi.Controllers
 
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser { UserName = userForRegisterDTO.Username, Email = userForRegisterDTO.Email };
+                var user = new ApplicationUser { UserName = userForRegisterDTO.Username, Email = userForRegisterDTO.Email , Gender = userForRegisterDTO.Gender};
                 var result = await _userManager.CreateAsync(user, userForRegisterDTO.Password);
                 if (result.Succeeded)
                 {
                     //return BuildToken(userForRegisterDTO);
+                    //var addToRole = await _userManager.AddToRoleAsync(await _userManager.FindByNameAsync(userForRegisterDTO.Username), "Normal");
                     return StatusCode(201);
                 }
                 else
                 {
-                    return BadRequest("Username or password invalid");
+                    return BadRequest("Nombre de usuario y/o contraseña incorrectos");
                 }
             }
             else
@@ -71,10 +73,10 @@ namespace ReservationWebApi.Controllers
         [HttpPost]
         [Route("Login")]
         public async Task<IActionResult> Login([FromBody] UserForLoginDTO UserForLoginDTO)
-        {            
+        {
             if (ModelState.IsValid)
             {
-                var result = await _signInManager.PasswordSignInAsync(UserForLoginDTO.Username, UserForLoginDTO.Password, 
+                var result = await _signInManager.PasswordSignInAsync(UserForLoginDTO.Username, UserForLoginDTO.Password,
                                                                       isPersistent: false, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
@@ -82,7 +84,7 @@ namespace ReservationWebApi.Controllers
                 }
                 else
                 {
-                    ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                    ModelState.AddModelError(string.Empty, "Username y/o Password Incorrectos");
                     return BadRequest(ModelState);
                 }
             }
@@ -94,18 +96,26 @@ namespace ReservationWebApi.Controllers
 
         private async Task<IActionResult> BuildToken(UserForLoginDTO userForLoginDTO)
         {
-            var role = await _roleManager.FindByNameAsync(userForLoginDTO.Username);
+            var user = await _userManager.FindByNameAsync(userForLoginDTO.Username);
+            var userInRoles = await _userManager.GetRolesAsync(user);
 
-            if (role == null)
-                return BadRequest();
-            
-            var claims = new[]
+            if (userInRoles == null)
             {
-                new Claim(JwtRegisteredClaimNames.UniqueName, userForLoginDTO.Username),
-                new Claim("miValor", "Lo que yo quiera"),
-                new Claim(ClaimTypes.Role, role.Name),
+                ModelState.AddModelError("Roles", "El usuario no pertenece a ningun rol");
+                return BadRequest(ModelState);
+            }
+                           
+
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim(JwtRegisteredClaimNames.Gender, user.Gender),
+                //new Claim("MasInformacion", "Cualquier cosa"),                
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
+
+            claims.AddRange(userInRoles.Select(role => new Claim(ClaimsIdentity.DefaultRoleClaimType, role)));
 
             var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_configuration.GetSection("AppSettings:Token").Value));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -113,8 +123,8 @@ namespace ReservationWebApi.Controllers
             var expiration = DateTime.UtcNow.AddHours(1);
 
             JwtSecurityToken token = new JwtSecurityToken(
-               issuer: "yourdomain.com",
-               audience: "yourdomain.com",
+               issuer: "tudominio.com",
+               audience: "tudominio.com",
                claims: claims,
                expires: expiration,
                signingCredentials: creds);
@@ -122,9 +132,9 @@ namespace ReservationWebApi.Controllers
             return Ok(new
             {
                 token = new JwtSecurityTokenHandler().WriteToken(token),
-                expiration = expiration
+                expiration
             });
 
-        }
+        }        
     }
 }
